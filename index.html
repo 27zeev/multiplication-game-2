@@ -15,7 +15,7 @@
             background: linear-gradient(135deg, #f0f9ff 0%, #c9e6ff 100%);
         }
         /* סגנון כללי לכדורים ולחריצים */
-        .orb, .slot {
+        .orb, .slot, .mc-button {
             transition: all 0.2s ease-in-out;
             cursor: pointer;
             user-select: none;
@@ -26,7 +26,7 @@
             font-size: 1.5rem;
             font-weight: bold;
         }
-        .orb:hover {
+        .orb:hover, .mc-button:hover {
             transform: scale(1.05);
             box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
         }
@@ -76,6 +76,22 @@
             color: white;
             box-shadow: 0 4px 6px rgba(13, 148, 136, 0.4);
         }
+
+        /* סגנון לכפתורי בחירה מרובה */
+        .mc-button {
+            width: 100%;
+            height: 64px;
+            background-color: #fca5a5; /* Red/Pink */
+            color: #881337;
+            border-radius: 12px;
+            font-size: 2rem;
+        }
+        .mc-button.correct {
+            background-color: #6ee7b7; /* Green */
+        }
+        .mc-button.incorrect {
+            background-color: #fca5a5; /* Red */
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -92,28 +108,35 @@
             </div>
         </div>
         
-        <!-- בחירת פעולה (חדש) -->
-        <div class="flex justify-around bg-gray-100 p-2 rounded-xl shadow-inner">
-            <button id="op-add" data-op="+" class="op-button bg-teal-600 active text-white" onclick="setOperation('+')">חיבור (+)</button>
-            <button id="op-subtract" data-op="-" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('-')">חיסור (-)</button>
-            <button id="op-multiply" data-op="*" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('*')">כפל (×)</button>
-            <button id="op-divide" data-op="/" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('/')">חילוק (÷)</button>
+        <!-- בחירת פעולה ומעבר מצב -->
+        <div class="flex flex-col gap-2">
+            <!-- בחירת פעולה -->
+            <div class="flex justify-around bg-gray-100 p-2 rounded-xl shadow-inner">
+                <button id="op-add" data-op="+" class="op-button bg-teal-600 active text-white" onclick="setOperation('+')">חיבור (+)</button>
+                <button id="op-subtract" data-op="-" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('-')">חיסור (-)</button>
+                <button id="op-multiply" data-op="*" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('*')">כפל (×)</button>
+                <button id="op-divide" data-op="/" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('/')">חילוק (÷)</button>
+            </div>
+            <!-- כפתור מעבר מצב -->
+             <button id="mode-toggle-button" class="bg-indigo-500 text-white p-2 rounded-xl font-bold shadow-md hover:bg-indigo-600 transition" onclick="toggleMode()">
+                החלף מצב (כעת: בחירה מרובה)
+            </button>
         </div>
 
 
-        <!-- 2A. אזור המפלצת (Monster Area) - Monster ו-Target זה לצד זה -->
+        <!-- 2A. אזור המפלצת (Monster Area) - Monster ו-Target / Equation זה לצד זה -->
         <div class="relative flex items-center justify-around h-48 bg-purple-100 rounded-2xl p-4 shadow-inner">
             
             <!-- גרפיקת המפלצת -->
             <div id="monster-graphic" class="text-7xl animate-bounce-slow" style="animation-duration: 4s;">
-                <!-- דוגמה למפלצת באמצעות אימוג'י -->
                 👾
             </div>
 
-            <!-- מספר המטרה והפעולה -->
-            <div class="bg-yellow-400 text-purple-800 rounded-full py-3 px-8 shadow-xl text-5xl font-black border-4 border-white">
+            <!-- מספר המטרה / תרגיל -->
+            <div id="target-display-area" class="bg-yellow-400 text-purple-800 rounded-xl py-4 px-4 shadow-xl text-4xl font-black border-4 border-white">
+                <!-- במצב 'מצא שניים': יכיל את מספר המטרה (target-number) -->
+                <!-- במצב 'בחירה מרובה': יכיל את התרגיל (mc-equation) -->
                 <span id="target-number">?</span>
-                <span id="operation-sign" class="text-4xl mr-1">+</span>
             </div>
 
             <!-- הודעות משוב -->
@@ -121,13 +144,19 @@
             <div id="confetti-container" class="confetti"></div>
         </div>
 
-        <!-- 2B. אזור בחירת המספרים (Number Selection Area) -->
-        <div id="orb-container" class="flex flex-wrap justify-center gap-2 min-h-[120px] p-2 bg-white rounded-xl shadow-lg border border-gray-200">
+        <!-- 2B. אזור בחירת המספרים (Find-Two Mode) -->
+        <div id="orb-container" class="mode-find-two flex flex-wrap justify-center gap-2 min-h-[120px] p-2 bg-white rounded-xl shadow-lg border border-gray-200 hidden">
             <!-- כדורי המספרים יוכנסו כאן על ידי JavaScript -->
         </div>
+        
+        <!-- 2B-MC. אזור בחירה מרובה (Multiple Choice Mode) -->
+        <div id="mc-container" class="mode-mc grid grid-cols-2 gap-3 min-h-[120px] p-2 bg-white rounded-xl shadow-lg border border-gray-200">
+             <!-- כפתורי התשובות יוכנסו כאן על ידי JavaScript -->
+        </div>
 
-        <!-- 2C. אזור השילוב (Combination Area) -->
-        <div class="flex flex-col items-center gap-4 p-4 bg-white rounded-2xl shadow-xl border-t-4 border-blue-500">
+
+        <!-- 2C. אזור השילוב (Combination Area) - מוסתר במצב בחירה מרובה -->
+        <div id="combination-area" class="mode-find-two flex flex-col items-center gap-4 p-4 bg-white rounded-2xl shadow-xl border-t-4 border-blue-500 hidden">
             <div class="flex items-center justify-center gap-2 sm:gap-4 text-3xl font-bold">
                 
                 <!-- חריץ 1 -->
@@ -151,7 +180,7 @@
             </div>
         </div>
         
-        <!-- כפתורי עזר (הוסרו) -->
+        <!-- ריווח תחתון -->
         <div class="h-8"></div> 
 
     </div>
@@ -159,14 +188,17 @@
 <script>
     // הגדרות ופונקציות עזר גלובליות
     const GameState = {
-        target: 0,
-        operation: '+', // ברירת מחדל חיבור
-        orbs: [],
-        solution: { num1: 0, num2: 0 },
+        target: 0, // התשובה הנכונה
+        operation: '+', 
+        orbs: [], // רשימת כדורים למצב 'מצא שניים'
+        solution: { num1: 0, num2: 0 }, // הפתרון למצב 'מצא שניים'
         selectedOrbs: { 1: null, 2: null }, // { slotId: { value, originalId } }
         score: 0,
         streak: 0,
         isBusy: false,
+        // *** מצב המשחק החדש ***
+        mode: 'multiple-choice', // שינוי ברירת המחדל למצב בחירה מרובה
+        mcQuestion: { num1: 0, num2: 0, answer: 0, decoys: [] }, // נתונים למצב בחירה מרובה
     };
 
     // Tone.js Setups
@@ -210,17 +242,40 @@
     // פונקציות UI
     const scoreDisplay = document.getElementById('score-display');
     const streakDisplay = document.getElementById('streak-display');
-    const targetNumberEl = document.getElementById('target-number');
-    const operationSignEl = document.getElementById('operation-sign');
-    const orbContainer = document.getElementById('orb-container');
+    const targetDisplayArea = document.getElementById('target-display-area'); // מכיל את המספר/תרגיל
+    const orbContainer = document.getElementById('orb-container'); // אזור מצא שניים
+    const mcContainer = document.getElementById('mc-container'); // אזור בחירה מרובה
     const slot1El = document.getElementById('slot-1');
     const slot2El = document.getElementById('slot-2');
     const feedbackMessageEl = document.getElementById('feedback-message');
     const monsterGraphicEl = document.getElementById('monster-graphic');
+    const modeToggleButton = document.getElementById('mode-toggle-button');
+    const combinationArea = document.getElementById('combination-area');
 
-    // פונקציה חדשה לשינוי פעולה
+    // פונקציה חדשה למעבר בין מצבים
+    function toggleMode() {
+        if (GameState.isBusy) return;
+
+        GameState.mode = (GameState.mode === 'find-two') ? 'multiple-choice' : 'find-two';
+        GameState.score = 0; // איפוס ניקוד ורצף במעבר מצב
+        GameState.streak = 0;
+        
+        modeToggleButton.textContent = (GameState.mode === 'find-two') ? 
+            'החלף מצב (כעת: מצא שניים)' : 
+            'החלף מצב (כעת: בחירה מרובה)';
+        
+        // הצגה/הסתרה של אזורי המשחק
+        orbContainer.classList.toggle('hidden', GameState.mode !== 'find-two');
+        combinationArea.classList.toggle('hidden', GameState.mode !== 'find-two');
+        mcContainer.classList.toggle('hidden', GameState.mode !== 'multiple-choice');
+
+        // טעינת בעיה חדשה במצב החדש
+        generateProblem();
+    }
+
+    // פונקציה לשינוי פעולה
     function setOperation(op) {
-        if (GameState.operation === op) return; // אם הפעולה הנוכחית, אין מה לעשות
+        if (GameState.operation === op) return;
 
         GameState.operation = op;
         GameState.score = 0; // איפוס ניקוד ורצף במעבר בין פעולות
@@ -243,19 +298,32 @@
     function updateUI() {
         scoreDisplay.textContent = GameState.score;
         streakDisplay.textContent = GameState.streak;
-        targetNumberEl.textContent = GameState.target;
-
+        
         // החלפת סימנים בממשק לטקסט הנכון
         let opSymbol = GameState.operation;
         if (opSymbol === '*') opSymbol = '×';
         if (opSymbol === '/') opSymbol = '÷';
-
-        operationSignEl.textContent = opSymbol;
         document.getElementById('equation-op').textContent = opSymbol;
-        
-        // עדכון חריצים
-        renderSlot(slot1El, GameState.selectedOrbs[1]);
-        renderSlot(slot2El, GameState.selectedOrbs[2]);
+
+        // עדכון אזור המטרה בהתאם למצב
+        if (GameState.mode === 'find-two') {
+            targetDisplayArea.innerHTML = `<span id="target-number">${GameState.target}</span>`;
+            targetDisplayArea.classList.add('rounded-full', 'py-3', 'px-8');
+            targetDisplayArea.classList.remove('rounded-xl', 'py-4', 'px-4', 'text-4xl');
+        } else { // multiple-choice
+            targetDisplayArea.innerHTML = `<span id="mc-equation">${GameState.mcQuestion.num1} ${opSymbol} ${GameState.mcQuestion.num2} = ?</span>`;
+            targetDisplayArea.classList.remove('rounded-full', 'py-3', 'px-8');
+            targetDisplayArea.classList.add('rounded-xl', 'py-4', 'px-4', 'text-4xl'); // סגנון מלבני לתרגיל
+            renderMultipleChoiceButtons(GameState.mcQuestion.answers);
+        }
+
+
+        if (GameState.mode === 'find-two') {
+            // עדכון חריצים
+            renderSlot(slot1El, GameState.selectedOrbs[1]);
+            renderSlot(slot2El, GameState.selectedOrbs[2]);
+            renderOrbs();
+        }
     }
 
     function renderSlot(slotEl, orbData) {
@@ -287,6 +355,19 @@
             }
         });
     }
+
+    function renderMultipleChoiceButtons(answers) {
+        mcContainer.innerHTML = '';
+        answers.forEach(answer => {
+            const buttonEl = document.createElement('button');
+            buttonEl.textContent = answer;
+            buttonEl.className = 'mc-button bg-pink-500 text-white hover:bg-pink-600 transition';
+            buttonEl.dataset.answer = answer;
+            buttonEl.addEventListener('click', handleMultipleChoiceClick);
+            mcContainer.appendChild(buttonEl);
+        });
+    }
+
 
     function showFeedback(message, isSuccess) {
         feedbackMessageEl.textContent = message;
@@ -331,24 +412,45 @@
         return Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
-    function generateProblem() {
-        let target, num1, num2;
-        const op = GameState.operation;
-        const minOrbs = 6;
-        const maxOrbs = 8;
-        const minVal = (op === '+' || op === '*') ? 1 : 2; // הימנעות מ-0 או 1 בחלק מהמקרים
-
-        // 1. יצירת פתרון (Solution) בהתאם לפעולה
+    /**
+     * מחשב את התוצאה של תרגיל בהתאם לפעולה.
+     */
+    function calculateResult(num1, num2, op) {
+        let result;
         if (op === '+') {
-            // חיבור עד 20 (רמה קלה)
+            result = num1 + num2;
+        } else if (op === '*') {
+            result = num1 * num2;
+        } else if (op === '-') {
+            // בחיסור: תמיד הגדול פחות הקטן
+            result = Math.max(num1, num2) - Math.min(num1, num2);
+        } else if (op === '/') {
+            // בחילוק: תמיד הגדול חלקי הקטן.
+            const maxVal = Math.max(num1, num2);
+            const minVal = Math.min(num1, num2);
+            if (minVal === 0 || maxVal % minVal !== 0) {
+                 result = -1; // תוצאה לא שלמה
+            } else {
+                 result = maxVal / minVal;
+            }
+        }
+        return result;
+    }
+
+
+    function generateBaseProblem(op) {
+        let num1, num2, target;
+        const minVal = 1; 
+
+        if (op === '+') {
             num1 = getRandomInt(minVal, 10);
             num2 = getRandomInt(minVal, 10);
             target = num1 + num2;
             
         } else if (op === '-') {
-            // חיסור, תוצאה חיובית עד 10 (רמה קלה)
-            num1 = getRandomInt(5, 20); // המחסר (הגדול)
-            num2 = getRandomInt(1, num1 - 4); // המכפיל (הקטן), דואגים לתוצאה גדולה מ-4
+            // חיסור, תוצאה חיובית עד 10
+            num1 = getRandomInt(5, 20); 
+            num2 = getRandomInt(1, num1 - 4); 
             target = num1 - num2;
             
         } else if (op === '*') {
@@ -366,50 +468,91 @@
             num2 = factor2; // המחלק
         }
 
-        GameState.target = target;
-        // חשוב: הפתרון נשמר כזוג המספרים הנדרשים בחריצים
-        GameState.solution = { num1, num2 };
+        return { num1, num2, target };
+    }
+
+    function generateProblem() {
+        const op = GameState.operation;
+        const minOrbs = 6;
+        const maxOrbs = 8;
+        const minVal = 1;
+
+        const baseProblem = generateBaseProblem(op);
+        GameState.target = baseProblem.target;
         
-        // 2. יצירת רשימת כדורים (Orbs)
-        let solutionNumbers = [num1, num2];
-        // במקרה של חיסור וחילוק, ייתכן ש num1 ו num2 שווים (למשל 10-5=5, אז הפתרון הוא 10 ו 5).
-        // אך בחריצים המשתמש צריך לבחור שני מספרים שונים (המחולק והמחלק או המחסר והמכפיל).
-        const orbCount = getRandomInt(minOrbs, maxOrbs);
-        let allOrbs = [...solutionNumbers];
+        // --- מצב מצא שניים ---
+        if (GameState.mode === 'find-two') {
+            
+            // במצב מצא שניים, הפתרון הוא שני המספרים שיוצרים את ה-Target
+            // הבעיה הבסיסית מייצרת את num1, num2 כפתרון
+            GameState.solution = { num1: baseProblem.num1, num2: baseProblem.num2 };
+            
+            let solutionNumbers = [baseProblem.num1, baseProblem.num2];
+            const orbCount = getRandomInt(minOrbs, maxOrbs);
+            let allOrbs = [...solutionNumbers];
 
-        // הוספת מספרים מטעים
-        while (allOrbs.length < orbCount) {
-            let decoy;
-            let maxDecoy = (op === '*') ? 10 : (op === '+') ? 15 : 20;
+            // הוספת מספרים מטעים
+            while (allOrbs.length < orbCount) {
+                let decoy;
+                let maxDecoy = (op === '*') ? 10 : (op === '/') ? 10 : 20;
 
-            do {
-                decoy = getRandomInt(minVal, maxDecoy); 
-            } while (allOrbs.includes(decoy) || solutionNumbers.includes(decoy));
+                do {
+                    decoy = getRandomInt(minVal, maxDecoy); 
+                } while (allOrbs.includes(decoy) || solutionNumbers.includes(decoy));
 
-            // בדיקה שאינה יוצרת פתרון אחר (לא מושלמת אך מקטינה סיכוי לבלבול)
-            if (op === '+') {
-                 if (decoy + solutionNumbers[0] === target || decoy + solutionNumbers[1] === target) continue;
-            } else if (op === '*') {
-                if (decoy * solutionNumbers[0] === target || decoy * solutionNumbers[1] === target) continue;
+                allOrbs.push(decoy);
             }
 
-            allOrbs.push(decoy);
+            // ערבוב והכנת המצב
+            allOrbs.sort(() => Math.random() - 0.5);
+            GameState.orbs = allOrbs.map((value, index) => ({
+                id: index,
+                value: value,
+                inSlot: null // null, 1, or 2
+            }));
+
+            GameState.selectedOrbs = { 1: null, 2: null };
+
+
+        // --- מצב בחירה מרובה ---
+        } else {
+            // במצב בחירה מרובה, ה-Target הוא התשובה של התרגיל num1 op num2
+            GameState.mcQuestion = { 
+                num1: baseProblem.num1, 
+                num2: baseProblem.num2, 
+                answer: baseProblem.target
+            };
+
+            const answers = [baseProblem.target];
+            // const maxAnswerRange = (op === '*' || op === '/') ? 100 : 50;
+            
+            // יצירת 3 תשובות מטעות
+            while (answers.length < 4) {
+                let decoy;
+                
+                do {
+                    // יצירת תשובה מטעה קרובה
+                    decoy = baseProblem.target + getRandomInt(-5, 5);
+                    if (op === '*' || op === '/') {
+                        decoy = baseProblem.target + getRandomInt(-2, 2); // קרובות יותר בכפל/חילוק
+                    }
+
+                    // לוודא שהמספרים לא שליליים ושהם שונים מהתשובות הקיימות
+                } while (decoy <= 0 || answers.includes(decoy));
+                
+                answers.push(decoy);
+            }
+
+            // ערבוב התשובות
+            answers.sort(() => Math.random() - 0.5);
+            GameState.mcQuestion.answers = answers;
         }
 
-        // ערבוב והכנת המצב
-        allOrbs.sort(() => Math.random() - 0.5);
-        GameState.orbs = allOrbs.map((value, index) => ({
-            id: index,
-            value: value,
-            inSlot: null // null, 1, or 2
-        }));
 
-        GameState.selectedOrbs = { 1: null, 2: null };
         GameState.isBusy = false;
         
         // עדכון UI
         updateUI();
-        renderOrbs();
         monsterGraphicEl.textContent = ['👾', '👽', '👻', '🤖', '🦠'][Math.floor(Math.random() * 5)];
     }
 
@@ -429,35 +572,17 @@
     }
 
     /**
-     * מפעיל את הבדיקה האוטומטית לאחר שהמשתמש הציב שני מספרים.
+     * מפעיל את הבדיקה האוטומטית לאחר שהמשתמש הציב שני מספרים (במצב 'מצא שניים').
      */
-    function checkAndProceed() {
+    function checkFindTwo() {
         if (GameState.isBusy || !GameState.selectedOrbs[1] || !GameState.selectedOrbs[2]) return;
         GameState.isBusy = true;
 
         const val1 = GameState.selectedOrbs[1].value;
         const val2 = GameState.selectedOrbs[2].value;
 
-        let result;
-        const op = GameState.operation;
-
-        if (op === '+') {
-            result = val1 + val2;
-        } else if (op === '*') {
-            result = val1 * val2;
-        } else if (op === '-') {
-            // בחיסור: תמיד הגדול פחות הקטן
-            result = Math.max(val1, val2) - Math.min(val1, val2);
-        } else if (op === '/') {
-            // בחילוק: תמיד הגדול חלקי הקטן. אם לא מתחלק שלם, התוצאה תהיה שבר (שלא יתאים)
-            const maxVal = Math.max(val1, val2);
-            const minVal = Math.min(val1, val2);
-            if (minVal === 0 || maxVal % minVal !== 0) {
-                 result = -1; // תוצאה לא שלמה או חלוקה ב-0
-            } else {
-                 result = maxVal / minVal;
-            }
-        }
+        // במצב 'מצא שניים', התשובה הנכונה היא Target Number
+        const result = calculateResult(val1, val2, GameState.operation);
         
         if (result === GameState.target) {
             handleSuccess();
@@ -466,8 +591,9 @@
         }
     }
 
-
-    // מטפל בלחיצה על כדור (הזזה לחריץ הפנוי הראשון)
+    /**
+     * מטפל בלחיצה על כדור (הזזה לחריץ הפנוי הראשון) - מצב 'מצא שניים'
+     */
     function handleOrbClick(event) {
         if (GameState.isBusy) return;
 
@@ -498,26 +624,28 @@
             // *** הפעל בדיקה אוטומטית אם שני החריצים מלאים ***
             if (GameState.selectedOrbs[1] && GameState.selectedOrbs[2]) {
                 // המתן מעט כדי לאפשר למשתמש לראות את ההצבה
-                setTimeout(checkAndProceed, 300); 
+                setTimeout(checkFindTwo, 300); 
             }
 
         } else {
-            // אם אין חריץ פנוי, החלף את הראשון (למשל)
-            // החזר את הכדור הישן
-            const oldOrbId = GameState.selectedOrbs[1].originalId;
-            GameState.orbs.find(o => o.id === oldOrbId).inSlot = null;
-
-            // עדכן את החריץ 1 בכדור החדש
-            GameState.selectedOrbs[1] = { value, originalId };
-            GameState.orbs.find(o => o.id === originalId).inSlot = 1;
-
-            // רנדר מחדש כדי להציג את הכדור הישן חזרה
-            renderOrbs();
-            updateUI();
+            // לוגיקה להחלפת הראשון (כפי שהוגדר קודם)
+            const oldOrbData = GameState.selectedOrbs[1];
+            if(oldOrbData) {
+                // 1. החזר את הכדור הישן לאזור הבחירה
+                GameState.orbs.find(o => o.id === oldOrbData.originalId).inSlot = null;
+                
+                // 2. עדכן את החריץ 1 בכדור החדש
+                GameState.selectedOrbs[1] = { value, originalId };
+                GameState.orbs.find(o => o.id === originalId).inSlot = 1;
+            
+                // 3. רנדר מחדש
+                renderOrbs();
+                updateUI();
+            }
         }
     }
 
-    // מטפל בלחיצה על חריץ (החזרת הכדור לאזור הבחירה)
+    // מטפל בלחיצה על חריץ (החזרת הכדור לאזור הבחירה) - מצב 'מצא שניים'
     function handleSlotClick(event) {
         if (GameState.isBusy) return;
 
@@ -537,6 +665,28 @@
         }
     }
 
+    /**
+     * מטפל בלחיצה על כפתור תשובה במצב 'בחירה מרובה'
+     */
+    function handleMultipleChoiceClick(event) {
+        if (GameState.isBusy) return;
+        GameState.isBusy = true;
+
+        const buttonEl = event.currentTarget;
+        const selectedAnswer = parseInt(buttonEl.dataset.answer);
+        const isCorrect = selectedAnswer === GameState.mcQuestion.answer;
+
+        // סימון ויזואלי מהיר של התשובה
+        buttonEl.classList.remove('bg-pink-500', 'hover:bg-pink-600');
+        buttonEl.classList.add(isCorrect ? 'bg-green-500' : 'bg-red-500');
+
+        if (isCorrect) {
+            handleSuccess();
+        } else {
+            handleFailure(true, buttonEl); // True כדי לנקות רק את הכפתור שנלחץ
+        }
+    }
+
     function handleSuccess() {
         playSuccessSound();
         showFeedback("מפלצת שבעה! 🎉", true);
@@ -546,9 +696,11 @@
         GameState.score += 10;
         GameState.streak += 1;
         
-        // אנימציית 'בליעה' (הכדורים נעלמים)
-        slot1El.classList.add('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
-        slot2El.classList.add('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+        // אנימציית 'בליעה' / שמחה
+        if (GameState.mode === 'find-two') {
+            slot1El.classList.add('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+            slot2El.classList.add('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+        }
         monsterGraphicEl.classList.add('animate-ping-once', 'text-yellow-500'); // אנימציית שמחה
 
         if (GameState.streak % 5 === 0 && GameState.streak > 0) {
@@ -559,8 +711,16 @@
 
         setTimeout(() => {
             // ניקוי והתחלה מחדש
-            slot1El.classList.remove('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
-            slot2El.classList.remove('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+            if (GameState.mode === 'find-two') {
+                slot1El.classList.remove('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+                slot2El.classList.remove('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+            }
+            // איפוס כפתורי בחירה מרובה
+            document.querySelectorAll('.mc-button').forEach(btn => {
+                btn.classList.remove('bg-green-500', 'bg-red-500');
+                btn.classList.add('bg-pink-500', 'hover:bg-pink-600');
+            });
+            
             monsterGraphicEl.classList.remove('animate-ping-once', 'text-yellow-500');
 
             generateProblem(); // טעינת המפלצת הבאה
@@ -568,7 +728,7 @@
         }, 1500);
     }
 
-    function handleFailure() {
+    function handleFailure(isMultipleChoice = false, failedButton = null) {
         playFailureSound();
         showFeedback("נסה שוב! 🙁", false);
         
@@ -581,16 +741,24 @@
 
         setTimeout(() => {
             monsterGraphicEl.classList.remove('animate-shake', 'text-red-500');
-            resetSlots();
+            
+            if (GameState.mode === 'find-two') {
+                resetSlots();
+            } else if (isMultipleChoice && failedButton) {
+                // במצב בחירה מרובה, פשוט מחזירים את הכפתור שנלחץ למצב רגיל
+                failedButton.classList.remove('bg-red-500');
+                failedButton.classList.add('bg-pink-500', 'hover:bg-pink-600');
+            }
+
             GameState.isBusy = false;
         }, 1000);
     }
     
-    // Event Listeners for Slots (for replacement/removal)
+    // Event Listeners for Slots (for replacement/removal) - מצב מצא שניים
     slot1El.addEventListener('click', handleSlotClick);
     slot2El.addEventListener('click', handleSlotClick);
 
-    // הגדרת אנימציית רעידה עבור כישלון
+    // הגדרת אנימציות
     const style = document.createElement('style');
     style.innerHTML += `
         @keyframes shake {
@@ -614,8 +782,14 @@
     // אתחול המשחק
     window.onload = function() {
         initAudio();
-        // קוראים ל-setOperation עם ברירת המחדל כדי לאתחל את הכפתורים ואת הבעיה הראשונה
+        // הגדרת המצב ההתחלתי: 'multiple-choice'
+        GameState.mode = 'multiple-choice';
+        
+        // קוראים ל-setOperation עם ברירת המחדל (+) כדי לאתחל את הכפתורים ואת הבעיה הראשונה
         setOperation('+'); 
+        
+        // עדכון טקסט הכפתור לאחר האתחול
+        modeToggleButton.textContent = 'החלף מצב (כעת: בחירה מרובה)';
     };
 </script>
 </body>
