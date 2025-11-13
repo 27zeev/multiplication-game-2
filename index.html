@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מפלצות החשבון</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- טעינת Tone.js לצלילי משוב -->
+    <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+    <style>
+        /* הגדרת גופן Varela Round לתמיכה יפה בעברית */
+        body {
+            font-family: 'Varela Round', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #c9e6ff 100%);
+        }
+        /* סגנון כללי לכדורים ולחריצים */
+        .orb, .slot {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .orb:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .slot {
+            background-color: #e0f2fe; /* light blue for empty slot */
+            border: 4px dashed #90cdf4;
+            color: #6366f1;
+        }
+        .monster-reaction {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5rem;
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0;
+            animation: fadePop 1s ease-out;
+        }
+        @keyframes fadePop {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3); }
+        }
+
+        .confetti {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 50;
+        }
+        .op-button {
+            padding: 8px 12px;
+            border-radius: 9999px;
+            font-weight: bold;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .op-button:hover:not(.active) {
+            transform: translateY(-1px);
+        }
+        .op-button.active {
+            background-color: #0d9488; /* teal-600 */
+            color: white;
+            box-shadow: 0 4px 6px rgba(13, 148, 136, 0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="game-container" class="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4" style="min-height: 80vh;">
+
+        <!-- סטטיסטיקות עליונות -->
+        <div class="flex justify-between text-lg font-medium text-gray-700">
+            <div>
+                ניקוד: <span id="score-display" class="text-blue-600 font-extrabold">0</span>
+            </div>
+            <div>
+                רצף ניצחונות: <span id="streak-display" class="text-pink-600 font-extrabold">0</span>
+            </div>
+        </div>
+        
+        <!-- בחירת פעולה (חדש) -->
+        <div class="flex justify-around bg-gray-100 p-2 rounded-xl shadow-inner">
+            <button id="op-add" data-op="+" class="op-button bg-teal-600 active text-white" onclick="setOperation('+')">חיבור (+)</button>
+            <button id="op-subtract" data-op="-" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('-')">חיסור (-)</button>
+            <button id="op-multiply" data-op="*" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('*')">כפל (×)</button>
+            <button id="op-divide" data-op="/" class="op-button bg-gray-300 text-gray-700" onclick="setOperation('/')">חילוק (÷)</button>
+        </div>
+
+
+        <!-- 2A. אזור המפלצת (Monster Area) - Monster ו-Target זה לצד זה -->
+        <div class="relative flex items-center justify-around h-48 bg-purple-100 rounded-2xl p-4 shadow-inner">
+            
+            <!-- גרפיקת המפלצת -->
+            <div id="monster-graphic" class="text-7xl animate-bounce-slow" style="animation-duration: 4s;">
+                <!-- דוגמה למפלצת באמצעות אימוג'י -->
+                👾
+            </div>
+
+            <!-- מספר המטרה והפעולה -->
+            <div class="bg-yellow-400 text-purple-800 rounded-full py-3 px-8 shadow-xl text-5xl font-black border-4 border-white">
+                <span id="target-number">?</span>
+                <span id="operation-sign" class="text-4xl mr-1">+</span>
+            </div>
+
+            <!-- הודעות משוב -->
+            <div id="feedback-message" class="monster-reaction"></div>
+            <div id="confetti-container" class="confetti"></div>
+        </div>
+
+        <!-- 2B. אזור בחירת המספרים (Number Selection Area) -->
+        <div id="orb-container" class="flex flex-wrap justify-center gap-2 min-h-[120px] p-2 bg-white rounded-xl shadow-lg border border-gray-200">
+            <!-- כדורי המספרים יוכנסו כאן על ידי JavaScript -->
+        </div>
+
+        <!-- 2C. אזור השילוב (Combination Area) -->
+        <div class="flex flex-col items-center gap-4 p-4 bg-white rounded-2xl shadow-xl border-t-4 border-blue-500">
+            <div class="flex items-center justify-center gap-2 sm:gap-4 text-3xl font-bold">
+                
+                <!-- חריץ 1 -->
+                <div id="slot-1" data-slot="1" class="slot w-20 h-20 rounded-full">?</div>
+
+                <!-- סימן פעולה -->
+                <div id="equation-op" class="text-blue-600 text-4xl mx-2">+</div>
+                
+                <!-- חריץ 2 -->
+                <div id="slot-2" data-slot="2" class="slot w-20 h-20 rounded-full">?</div>
+                
+                <!-- סימן שווה -->
+                <div class="text-gray-500 text-4xl mx-2">=</div>
+                
+                <!-- סימן שאלה -->
+                <div class="text-gray-500 text-4xl">?</div>
+            </div>
+            
+            <!-- ריווח -->
+            <div class="flex gap-4 w-full justify-center h-12">
+            </div>
+        </div>
+        
+        <!-- כפתורי עזר (הוסרו) -->
+        <div class="h-8"></div> 
+
+    </div>
+
+<script>
+    // הגדרות ופונקציות עזר גלובליות
+    const GameState = {
+        target: 0,
+        operation: '+', // ברירת מחדל חיבור
+        orbs: [],
+        solution: { num1: 0, num2: 0 },
+        selectedOrbs: { 1: null, 2: null }, // { slotId: { value, originalId } }
+        score: 0,
+        streak: 0,
+        isBusy: false,
+    };
+
+    // Tone.js Setups
+    let successSynth = null;
+    let failureSynth = null;
+
+    function initAudio() {
+        try {
+            // צליל הצלחה: מנגינה עולה קצרה
+            successSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "sine" },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 }
+            }).toDestination();
+            
+            // צליל כישלון: טון יורד קצר
+            failureSynth = new Tone.Synth({
+                oscillator: { type: "square" },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.01, release: 0.2 }
+            }).toDestination();
+
+        } catch (e) {
+            console.error("Tone.js initialization failed:", e);
+        }
+    }
+
+    function playSuccessSound() {
+        if (successSynth) {
+            const now = Tone.now();
+            successSynth.triggerAttackRelease(["C5", "E5", "G5"], "8n", now);
+        }
+    }
+
+    function playFailureSound() {
+        if (failureSynth) {
+            const now = Tone.now();
+            failureSynth.triggerAttackRelease("C4", "16n", now);
+            failureSynth.triggerAttackRelease("A3", "16n", now + 0.1);
+        }
+    }
+
+    // פונקציות UI
+    const scoreDisplay = document.getElementById('score-display');
+    const streakDisplay = document.getElementById('streak-display');
+    const targetNumberEl = document.getElementById('target-number');
+    const operationSignEl = document.getElementById('operation-sign');
+    const orbContainer = document.getElementById('orb-container');
+    const slot1El = document.getElementById('slot-1');
+    const slot2El = document.getElementById('slot-2');
+    const feedbackMessageEl = document.getElementById('feedback-message');
+    const monsterGraphicEl = document.getElementById('monster-graphic');
+
+    // פונקציה חדשה לשינוי פעולה
+    function setOperation(op) {
+        if (GameState.operation === op) return; // אם הפעולה הנוכחית, אין מה לעשות
+
+        GameState.operation = op;
+        GameState.score = 0; // איפוס ניקוד ורצף במעבר בין פעולות
+        GameState.streak = 0;
+
+        // עדכון כפתורים
+        document.querySelectorAll('.op-button').forEach(btn => {
+            btn.classList.remove('active', 'bg-teal-600', 'text-white');
+            btn.classList.add('bg-gray-300', 'text-gray-700');
+            if (btn.dataset.op === op) {
+                btn.classList.add('active', 'bg-teal-600', 'text-white');
+                btn.classList.remove('bg-gray-300', 'text-gray-700');
+            }
+        });
+        
+        generateProblem();
+    }
+
+
+    function updateUI() {
+        scoreDisplay.textContent = GameState.score;
+        streakDisplay.textContent = GameState.streak;
+        targetNumberEl.textContent = GameState.target;
+
+        // החלפת סימנים בממשק לטקסט הנכון
+        let opSymbol = GameState.operation;
+        if (opSymbol === '*') opSymbol = '×';
+        if (opSymbol === '/') opSymbol = '÷';
+
+        operationSignEl.textContent = opSymbol;
+        document.getElementById('equation-op').textContent = opSymbol;
+        
+        // עדכון חריצים
+        renderSlot(slot1El, GameState.selectedOrbs[1]);
+        renderSlot(slot2El, GameState.selectedOrbs[2]);
+    }
+
+    function renderSlot(slotEl, orbData) {
+        if (orbData) {
+            slotEl.textContent = orbData.value;
+            slotEl.style.backgroundColor = '#60a5fa'; // Blue when filled
+            slotEl.style.color = 'white';
+            slotEl.style.border = '4px solid #3b82f6';
+        } else {
+            slotEl.textContent = '?';
+            slotEl.style.backgroundColor = '#e0f2fe'; // Light blue when empty
+            slotEl.style.color = '#6366f1';
+            slotEl.style.border = '4px dashed #90cdf4';
+        }
+    }
+
+    function renderOrbs() {
+        orbContainer.innerHTML = '';
+        GameState.orbs.forEach(orb => {
+            if (!orb.inSlot) {
+                const orbEl = document.createElement('div');
+                orbEl.id = `orb-${orb.id}`;
+                orbEl.textContent = orb.value;
+                orbEl.className = 'orb w-14 h-14 rounded-full bg-pink-500 text-white';
+                orbEl.dataset.value = orb.value;
+                orbEl.dataset.id = orb.id;
+                orbEl.addEventListener('click', handleOrbClick);
+                orbContainer.appendChild(orbEl);
+            }
+        });
+    }
+
+    function showFeedback(message, isSuccess) {
+        feedbackMessageEl.textContent = message;
+        feedbackMessageEl.className = 'monster-reaction ' + (isSuccess ? 'text-green-600' : 'text-red-600');
+        feedbackMessageEl.style.opacity = 1;
+
+        // הפעלה מחדש של אנימציה
+        feedbackMessageEl.style.animation = 'none';
+        void feedbackMessageEl.offsetWidth; // Force reflow
+        feedbackMessageEl.style.animation = 'fadePop 1s ease-out';
+    }
+
+    function showConfetti() {
+        const confettiContainer = document.getElementById('confetti-container');
+        confettiContainer.innerHTML = '';
+        const count = 30;
+        for (let i = 0; i < count; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'absolute w-2 h-2 rounded-full';
+            particle.style.backgroundColor = ['#f97316', '#ef4444', '#f59e0b', '#10b981', '#3b82f6'][Math.floor(Math.random() * 5)];
+            particle.style.left = `${Math.random() * 100}%`;
+            particle.style.top = `${Math.random() * 100}%`;
+            particle.style.animation = `confetti-fall ${Math.random() * 2 + 1}s ease-out ${Math.random() * 0.5}s forwards`;
+            confettiContainer.appendChild(particle);
+        }
+
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes confetti-fall {
+                0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+                100% { transform: translateY(100vh) rotate(${Math.random() * 720 + 360}deg) scale(0); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+        setTimeout(() => confettiContainer.innerHTML = '', 1500); // ניקוי אחרי 1.5 שניות
+    }
+
+
+    // לוגיקת יצירת בעיות
+    
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function generateProblem() {
+        let target, num1, num2;
+        const op = GameState.operation;
+        const minOrbs = 6;
+        const maxOrbs = 8;
+        const minVal = (op === '+' || op === '*') ? 1 : 2; // הימנעות מ-0 או 1 בחלק מהמקרים
+
+        // 1. יצירת פתרון (Solution) בהתאם לפעולה
+        if (op === '+') {
+            // חיבור עד 20 (רמה קלה)
+            num1 = getRandomInt(minVal, 10);
+            num2 = getRandomInt(minVal, 10);
+            target = num1 + num2;
+            
+        } else if (op === '-') {
+            // חיסור, תוצאה חיובית עד 10 (רמה קלה)
+            num1 = getRandomInt(5, 20); // המחסר (הגדול)
+            num2 = getRandomInt(1, num1 - 4); // המכפיל (הקטן), דואגים לתוצאה גדולה מ-4
+            target = num1 - num2;
+            
+        } else if (op === '*') {
+            // כפל (לוח 10x10)
+            num1 = getRandomInt(minVal, 10);
+            num2 = getRandomInt(minVal, 10);
+            target = num1 * num2;
+            
+        } else if (op === '/') {
+            // חילוק (לוח 10x10)
+            let factor1 = getRandomInt(minVal, 10);
+            let factor2 = getRandomInt(minVal, 10);
+            target = factor1; // התוצאה
+            num1 = factor1 * factor2; // המחולק (הגדול)
+            num2 = factor2; // המחלק
+        }
+
+        GameState.target = target;
+        // חשוב: הפתרון נשמר כזוג המספרים הנדרשים בחריצים
+        GameState.solution = { num1, num2 };
+        
+        // 2. יצירת רשימת כדורים (Orbs)
+        let solutionNumbers = [num1, num2];
+        // במקרה של חיסור וחילוק, ייתכן ש num1 ו num2 שווים (למשל 10-5=5, אז הפתרון הוא 10 ו 5).
+        // אך בחריצים המשתמש צריך לבחור שני מספרים שונים (המחולק והמחלק או המחסר והמכפיל).
+        const orbCount = getRandomInt(minOrbs, maxOrbs);
+        let allOrbs = [...solutionNumbers];
+
+        // הוספת מספרים מטעים
+        while (allOrbs.length < orbCount) {
+            let decoy;
+            let maxDecoy = (op === '*') ? 10 : (op === '+') ? 15 : 20;
+
+            do {
+                decoy = getRandomInt(minVal, maxDecoy); 
+            } while (allOrbs.includes(decoy) || solutionNumbers.includes(decoy));
+
+            // בדיקה שאינה יוצרת פתרון אחר (לא מושלמת אך מקטינה סיכוי לבלבול)
+            if (op === '+') {
+                 if (decoy + solutionNumbers[0] === target || decoy + solutionNumbers[1] === target) continue;
+            } else if (op === '*') {
+                if (decoy * solutionNumbers[0] === target || decoy * solutionNumbers[1] === target) continue;
+            }
+
+            allOrbs.push(decoy);
+        }
+
+        // ערבוב והכנת המצב
+        allOrbs.sort(() => Math.random() - 0.5);
+        GameState.orbs = allOrbs.map((value, index) => ({
+            id: index,
+            value: value,
+            inSlot: null // null, 1, or 2
+        }));
+
+        GameState.selectedOrbs = { 1: null, 2: null };
+        GameState.isBusy = false;
+        
+        // עדכון UI
+        updateUI();
+        renderOrbs();
+        monsterGraphicEl.textContent = ['👾', '👽', '👻', '🤖', '🦠'][Math.floor(Math.random() * 5)];
+    }
+
+
+    function resetSlots() {
+        // מחזיר את הכדורים לחלון הבחירה ומנקה את החריצים
+        if (GameState.selectedOrbs[1]) {
+            GameState.orbs.find(o => o.id === GameState.selectedOrbs[1].originalId).inSlot = null;
+        }
+        if (GameState.selectedOrbs[2]) {
+            GameState.orbs.find(o => o.id === GameState.selectedOrbs[2].originalId).inSlot = null;
+        }
+        GameState.selectedOrbs = { 1: null, 2: null };
+
+        updateUI();
+        renderOrbs();
+    }
+
+    /**
+     * מפעיל את הבדיקה האוטומטית לאחר שהמשתמש הציב שני מספרים.
+     */
+    function checkAndProceed() {
+        if (GameState.isBusy || !GameState.selectedOrbs[1] || !GameState.selectedOrbs[2]) return;
+        GameState.isBusy = true;
+
+        const val1 = GameState.selectedOrbs[1].value;
+        const val2 = GameState.selectedOrbs[2].value;
+
+        let result;
+        const op = GameState.operation;
+
+        if (op === '+') {
+            result = val1 + val2;
+        } else if (op === '*') {
+            result = val1 * val2;
+        } else if (op === '-') {
+            // בחיסור: תמיד הגדול פחות הקטן
+            result = Math.max(val1, val2) - Math.min(val1, val2);
+        } else if (op === '/') {
+            // בחילוק: תמיד הגדול חלקי הקטן. אם לא מתחלק שלם, התוצאה תהיה שבר (שלא יתאים)
+            const maxVal = Math.max(val1, val2);
+            const minVal = Math.min(val1, val2);
+            if (minVal === 0 || maxVal % minVal !== 0) {
+                 result = -1; // תוצאה לא שלמה או חלוקה ב-0
+            } else {
+                 result = maxVal / minVal;
+            }
+        }
+        
+        if (result === GameState.target) {
+            handleSuccess();
+        } else {
+            handleFailure();
+        }
+    }
+
+
+    // מטפל בלחיצה על כדור (הזזה לחריץ הפנוי הראשון)
+    function handleOrbClick(event) {
+        if (GameState.isBusy) return;
+
+        const orbEl = event.currentTarget;
+        const value = parseInt(orbEl.dataset.value);
+        const originalId = parseInt(orbEl.dataset.id);
+
+        let targetSlotId = null;
+
+        // מצא חריץ פנוי
+        if (!GameState.selectedOrbs[1]) {
+            targetSlotId = 1;
+        } else if (!GameState.selectedOrbs[2]) {
+            targetSlotId = 2;
+        }
+
+        if (targetSlotId) {
+            // אם יש חריץ פנוי, העבר אליו
+            GameState.selectedOrbs[targetSlotId] = { value, originalId };
+            GameState.orbs.find(o => o.id === originalId).inSlot = targetSlotId;
+            
+            // הסר את הכדור מאזור הבחירה
+            orbEl.removeEventListener('click', handleOrbClick);
+            orbEl.style.display = 'none';
+
+            updateUI(); // עדכן את ה-UI כדי להציג את המספר בחריץ
+
+            // *** הפעל בדיקה אוטומטית אם שני החריצים מלאים ***
+            if (GameState.selectedOrbs[1] && GameState.selectedOrbs[2]) {
+                // המתן מעט כדי לאפשר למשתמש לראות את ההצבה
+                setTimeout(checkAndProceed, 300); 
+            }
+
+        } else {
+            // אם אין חריץ פנוי, החלף את הראשון (למשל)
+            // החזר את הכדור הישן
+            const oldOrbId = GameState.selectedOrbs[1].originalId;
+            GameState.orbs.find(o => o.id === oldOrbId).inSlot = null;
+
+            // עדכן את החריץ 1 בכדור החדש
+            GameState.selectedOrbs[1] = { value, originalId };
+            GameState.orbs.find(o => o.id === originalId).inSlot = 1;
+
+            // רנדר מחדש כדי להציג את הכדור הישן חזרה
+            renderOrbs();
+            updateUI();
+        }
+    }
+
+    // מטפל בלחיצה על חריץ (החזרת הכדור לאזור הבחירה)
+    function handleSlotClick(event) {
+        if (GameState.isBusy) return;
+
+        const slotEl = event.currentTarget;
+        const slotId = parseInt(slotEl.dataset.slot);
+        
+        if (GameState.selectedOrbs[slotId]) {
+            // החזר את הכדור לאזור הבחירה
+            const originalId = GameState.selectedOrbs[slotId].originalId;
+            GameState.orbs.find(o => o.id === originalId).inSlot = null;
+            
+            // נקה את החריץ
+            GameState.selectedOrbs[slotId] = null;
+
+            updateUI();
+            renderOrbs(); // רנדר מחדש את הכדורים כדי להציג את הכדור שהוחזר
+        }
+    }
+
+    function handleSuccess() {
+        playSuccessSound();
+        showFeedback("מפלצת שבעה! 🎉", true);
+        showConfetti();
+
+        // עדכון ניקוד ורצף
+        GameState.score += 10;
+        GameState.streak += 1;
+        
+        // אנימציית 'בליעה' (הכדורים נעלמים)
+        slot1El.classList.add('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+        slot2El.classList.add('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+        monsterGraphicEl.classList.add('animate-ping-once', 'text-yellow-500'); // אנימציית שמחה
+
+        if (GameState.streak % 5 === 0 && GameState.streak > 0) {
+            setTimeout(() => {
+                showFeedback(`⭐ פתחתם פריט חדש! רצף ${GameState.streak} ⭐`, true);
+            }, 1000);
+        }
+
+        setTimeout(() => {
+            // ניקוי והתחלה מחדש
+            slot1El.classList.remove('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+            slot2El.classList.remove('transition-all', 'duration-500', 'translate-y-[-100px]', 'opacity-0');
+            monsterGraphicEl.classList.remove('animate-ping-once', 'text-yellow-500');
+
+            generateProblem(); // טעינת המפלצת הבאה
+            updateUI();
+        }, 1500);
+    }
+
+    function handleFailure() {
+        playFailureSound();
+        showFeedback("נסה שוב! 🙁", false);
+        
+        // עדכון ניקוד ורצף
+        GameState.score = Math.max(0, GameState.score - 3); // לא יורד מתחת ל-0
+        GameState.streak = 0;
+
+        // אנימציית כישלון
+        monsterGraphicEl.classList.add('animate-shake', 'text-red-500');
+
+        setTimeout(() => {
+            monsterGraphicEl.classList.remove('animate-shake', 'text-red-500');
+            resetSlots();
+            GameState.isBusy = false;
+        }, 1000);
+    }
+    
+    // Event Listeners for Slots (for replacement/removal)
+    slot1El.addEventListener('click', handleSlotClick);
+    slot2El.addEventListener('click', handleSlotClick);
+
+    // הגדרת אנימציית רעידה עבור כישלון
+    const style = document.createElement('style');
+    style.innerHTML += `
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-slow {
+            animation: bounce-slow 4s infinite ease-in-out;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // אתחול המשחק
+    window.onload = function() {
+        initAudio();
+        // קוראים ל-setOperation עם ברירת המחדל כדי לאתחל את הכפתורים ואת הבעיה הראשונה
+        setOperation('+'); 
+    };
+</script>
+</body>
+</html>
